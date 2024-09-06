@@ -172,7 +172,7 @@ with col2:
     df_pred2 = df_pred.copy()
     df_pred2.index = df_pred2.index.strftime('%Y-%m-%d')
     df_pred2 = df_pred2.reset_index()
-    df_pred2 = df_pred2.rename(columns={'index' : 'Tanggal', df_pred2.columns[1] : 'Prediction'})
+    df_pred2 = df_pred2.rename(columns={'index' : 'Tanggal', df_pred2.columns[1] : 'Prediksi'})
     st.dataframe(df_pred2, height = rows * 35 + 3, width = 400)
 
 add_space(2)
@@ -180,11 +180,11 @@ fig = go.Figure()
 subset_data = final_data[-30:]
 fig.add_trace(go.Scatter(x = subset_data.index, 
                          y = subset_data.iloc[:,0], 
-                         name ='Actual',
+                         name ='Aktual',
                          line=dict(color='#2B60DE')))
 fig.add_trace(go.Scatter(x = df_pred.index, 
                          y = df_pred.iloc[:,0], 
-                         name ='Prediction',
+                         name ='Prediksi',
                          line=dict(color='#50C878')))
 fig.layout.update(title_text = f"Grafik Prediksi Harga {name}", showlegend = True,
                   legend=dict(orientation="h",
