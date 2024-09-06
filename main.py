@@ -3,23 +3,24 @@ from datetime import date
 from plotly import graph_objs as go
 import pandas as pd
 import numpy as np
+from tensorflow.keras.models import load_model
+import joblib
+import time
+import math
+from datetime import timedelta
 
-# START = "2022-07-16"
-# today = date.today()
 #emojis = https://www.webfx.com/tools/emoji-cheat-sheet/
 st.set_page_config(page_title = "Aplikasi Prediksi Harga Beras",
                    page_icon = "📈")
-
 st.title("Aplikasi Prediksi Harga Beras")
 def add_space(n_space):
     for i in range(n_space):
         st.text(" ")
-
 add_space(3)
+
 rice_type = ("Beras Premium", "Beras Medium")
 col1, col2, col3 = st.columns(3)
 default_date = date(2024, 5, 31)
-
 with col1 : 
     selected_rice = st.selectbox("Jenis Beras", rice_type)
 with col2 :
@@ -37,8 +38,6 @@ beras_premium = beras_premium.asfreq('D')
 beras_medium = beras_medium.asfreq('D')
 
 def load_datesets(ticker, date1, date2):
-    # data = None
-    # rice_type = None
     if ticker == 'Beras Premium':
         data = beras_premium.loc[date1 : date2].copy() 
         final_data = beras_premium
@@ -47,15 +46,15 @@ def load_datesets(ticker, date1, date2):
         data = beras_medium.loc[date1 : date2].copy()
         final_data = beras_medium
         rice_type = 'medium'
+    
     return data, final_data, ticker, rice_type
-
 
 data, final_data, name, rice_type = load_datesets(selected_rice, start_date, end_date)
 data.index = data.index.strftime('%Y-%m-%d')
 data = data.reset_index()
 data = data.rename(columns={'tanggal':'Tanggal', data.columns[1] : name})
-
 load_data_state = st.text("")
+
 if(data is not None):
     load_data_state.text("Data berhasil dimuat!")
 else:
@@ -68,7 +67,6 @@ col1, col2, col3 = st.columns([1,2,1])
 with col2:
     rows = 8
     st.dataframe(data, height = rows * 35 + 3, width = 400)
-
 
 fig = go.Figure()
 fig.add_trace(go.Scatter(x = data['Tanggal'], 
@@ -83,16 +81,10 @@ fig.layout.update(title_text = f"Grafik Harga {name}", showlegend = True,
                               x = 0.1,
                               font = dict(size = 14)))
 st.plotly_chart(fig)
-
-
 ##Forecasting
 add_space(1)
 st.subheader('Prediksi Harga 14 Hari Kedepan')
 add_space(2)
-
-from tensorflow.keras.models import load_model
-import joblib
-
 window_size = 5
 steps = 14
 
@@ -109,8 +101,6 @@ def load_model_final():
     
     return sc, sarima_model, lstm_model
 
-sc, sarima_model, lstm_model = load_model_final()
-
 def make_data_direct(data, window_size, n_steps):
   x1, y1 = [], []
   for i in range(len(data) - window_size - n_steps + 1):
@@ -118,8 +108,6 @@ def make_data_direct(data, window_size, n_steps):
     y1.append(data[(i + window_size):(i + window_size + n_steps)])
 
   return np.array(x1), np.array(y1)
-
-import time
 
 def direct_lstm_pred(models, x, scaler, n_steps):
   # predict
@@ -155,8 +143,6 @@ def residualForLstm(actual, pred, scaller):
 
   return resid_scaled
 
-import math
-
 def hybrid_model_predict(X, scaller):
   sarima_pred= sarima_model.predict(start = X.index[0], end = X.index[-1])
   resid_scaled= residualForLstm(X, sarima_pred, scaller)
@@ -172,15 +158,14 @@ def hybrid_model_predict(X, scaller):
     final_pred[f'step {i+1}'] = sarima_pred2[i] + resid_pred[i]
   return final_pred
 
+sc, sarima_model, lstm_model = load_model_final()
 pred = hybrid_model_predict(final_data, sc)
 final_pred = pred[pred.shape[0]-1:]
 final_pred = final_pred.transpose() 
-
-from datetime import timedelta
 last_date = final_data.index.max()
 new_date = pd.date_range(start = last_date + timedelta(days = 1), periods = steps)
 df_pred = pd.DataFrame({f'{final_data.columns[0]}': final_pred.iloc[:,0].values}, index = new_date)
-
+add_space(2)
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     rows = 15
