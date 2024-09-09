@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date
+from datetime import date, timedelta, datetime
 from plotly import graph_objs as go
 import pandas as pd
 import numpy as np
@@ -7,7 +7,6 @@ from tensorflow.keras.models import load_model
 import joblib
 import time
 import math
-from datetime import timedelta
 
 #emojis = https://www.webfx.com/tools/emoji-cheat-sheet/
 st.set_page_config(page_title = "Aplikasi Prediksi Harga Beras",
@@ -18,15 +17,21 @@ def add_space(n_space):
         st.text(" ")
 add_space(3)
 
+first_date = datetime(2022, 7, 15)
+last_date = datetime(2024, 5, 31)
 rice_type = ("Beras Premium", "Beras Medium")
 col1, col2, col3 = st.columns(3)
 default_date = date(2024, 5, 31)
 with col1 : 
     selected_rice = st.selectbox("Jenis Beras", rice_type)
 with col2 :
-    start_date = st.date_input("Tanggal dari :", value = default_date.replace(day = 1))
+    start_date = st.date_input("Tanggal dari :", value = default_date.replace(day = 1),
+                               min_value = first_date,
+                               max_value=last_date)
 with col3:
-    end_date = st.date_input("Tanggal ke :", value = default_date)
+    end_date = st.date_input("Tanggal ke :", value = default_date,
+                             min_value = first_date,
+                             max_value = last_date)
 
 beras_premium = pd.read_excel('datasets/beras_premium.xlsx')
 beras_medium = pd.read_excel('datasets/beras_medium.xlsx')
