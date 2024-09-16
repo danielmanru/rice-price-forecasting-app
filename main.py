@@ -7,6 +7,8 @@ from tensorflow.keras.models import load_model
 import joblib
 import time
 import math
+from scipy import stats
+from scipy.special import inv_boxcox
 
 #emojis = https://www.webfx.com/tools/emoji-cheat-sheet/
 st.set_page_config(page_title = "Aplikasi Prediksi Harga Beras",
@@ -44,17 +46,19 @@ beras_medium = beras_medium.asfreq('D')
 
 def load_datesets(ticker, date1, date2):
     if ticker == 'Beras Premium':
+        final_data = beras_premium.copy()
         data = beras_premium.loc[date1 : date2].copy() 
-        final_data = beras_premium
+        final_data['beras_premium'], lmd = stats.boxcox(beras_premium['beras_premium'])
         rice_type = 'premium'
     elif ticker == 'Beras Medium':
+        final_data = beras_medium.copy()
         data = beras_medium.loc[date1 : date2].copy()
-        final_data = beras_medium
+        final_data['beras_medium'], lmd = stats.boxcox(beras_medium['beras_medium'])
         rice_type = 'medium'
     
-    return data, final_data, ticker, rice_type
+    return data, final_data, ticker, rice_type, lmd
 
-data, final_data, name, rice_type = load_datesets(selected_rice, start_date, end_date)
+data, final_data, name, rice_type, lmd = load_datesets(selected_rice, start_date, end_date)
 data.index = data.index.strftime('%Y-%m-%d')
 data = data.reset_index()
 data = data.rename(columns={'tanggal':'Tanggal', data.columns[1] : name})
@@ -86,6 +90,7 @@ fig.layout.update(title_text = f"Grafik Harga {name}", showlegend = True,
                               x = 0.1,
                               font = dict(size = 14)))
 st.plotly_chart(fig)
+
 ##Forecasting
 add_space(1)
 st.subheader('Prediksi Harga 14 Hari Kedepan')
@@ -150,17 +155,17 @@ def residualForLstm(actual, pred, scaller):
 
 def hybrid_model_predict(X, scaller):
   sarima_pred= sarima_model.predict(start = X.index[0], end = X.index[-1])
-  resid_scaled= residualForLstm(X, sarima_pred, scaller)
-  x_am, y_am = make_data_direct(sarima_pred[1:], window_size, steps)
+  resid_scaled= residualForLstm(inv_boxcox(X, lmd), inv_boxcox(sarima_pred, lmd), scaller)
+  x_am, y_am = make_data_direct(inv_boxcox(sarima_pred[1:], lmd), window_size, steps)
   x, y = make_data_direct(resid_scaled, window_size, steps)
   direct_pred = direct_lstm_pred(lstm_model, x, scaller, steps)
 
   resid_pred = pd.DataFrame(direct_pred)
   sarima_pred2 = pd.DataFrame(y_am)
   final_pred = pd.DataFrame()
-  
   for i in range(steps):
     final_pred[f'step {i+1}'] = sarima_pred2[i] + resid_pred[i]
+
   return final_pred
 
 sc, sarima_model, lstm_model = load_model_final()
@@ -182,7 +187,9 @@ with col2:
 
 add_space(2)
 fig = go.Figure()
-subset_data = final_data[-30:]
+subset_data = final_data.copy()
+subset_data[subset_data.columns[0]] = inv_boxcox(subset_data[subset_data.columns[0]], lmd)
+subset_data = subset_data[-30:]
 fig.add_trace(go.Scatter(x = subset_data.index, 
                          y = subset_data.iloc[:,0], 
                          name ='Aktual',
