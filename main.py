@@ -153,25 +153,38 @@ def residualForLstm(actual, pred, scaller):
 
   return resid_scaled
 
-def hybrid_model_predict(X, scaller):
-  sarima_pred= sarima_model.predict(start = X.index[0], end = X.index[-1])
-  resid_scaled= residualForLstm(inv_boxcox(X, lmd), inv_boxcox(sarima_pred, lmd), scaller)
-  x_am, y_am = make_data_direct(inv_boxcox(sarima_pred[1:], lmd), window_size, steps)
-  x, y = make_data_direct(resid_scaled, window_size, steps)
-  direct_pred = direct_lstm_pred(lstm_model, x, scaller, steps)
+def make_data_input_only(data, window_size):
+  x_inp = []
+  for i in range(len(data) - window_size + 1):
+    x_inp.append(data[i:(i + window_size)])
 
-  resid_pred = pd.DataFrame(direct_pred)
-  sarima_pred2 = pd.DataFrame(y_am)
-  final_pred = pd.DataFrame()
-  for i in range(steps):
-    final_pred[f'step {i+1}'] = sarima_pred2[i] + resid_pred[i]
+  return np.array(x_inp)
 
-  return final_pred
+def hybrid_model_predict_final(sm_model, lm_model, X, scaller):
+  sm_pred= sm_model.predict(start = X.index[0], end = X.index[-1])
+  sm_forecast= sm_model.forecast(steps=14)
+  sm_forecast = inv_boxcox(sm_forecast, lmd)
+  data_temp = inv_boxcox(X, lmd)
+  data_temp['pred'] = inv_boxcox(sm_pred, lmd)
+  data_temp['residual'] = data_temp.iloc[:, 0] - data_temp.iloc[:, 1]
+  residual = pd.DataFrame(data_temp['residual'][1:], columns=['residual'])
+  resid_sc = scaller.fit_transform(residual)
+  x1 = make_data_input_only(resid_sc, window_size)
+  direct_pred = direct_lstm_pred(lm_model, x1, scaller, steps)
+
+  direct_pred1 = direct_pred[direct_pred.shape[0]-1:]
+  direct_pred1 = direct_pred1.transpose()
+  all_pred = sm_forecast.to_frame()
+  all_pred['resid_pred'] = direct_pred1
+  all_pred['result'] =  all_pred.iloc[:,0] + all_pred.iloc[:,1]
+
+  return all_pred['result'].to_frame()
 
 sc, sarima_model, lstm_model = load_model_final()
-pred = hybrid_model_predict(final_data, sc)
-final_pred = pred[pred.shape[0]-1:]
-final_pred = final_pred.transpose() 
+pred = hybrid_model_predict_final(sarima_model, lstm_model, final_data, sc)
+final_pred = pred
+# final_pred = pred[pred.shape[0]-1:]
+# final_pred = final_pred.transpose() 
 last_date = final_data.index.max()
 new_date = pd.date_range(start = last_date + timedelta(days = 1), periods = steps)
 df_pred = pd.DataFrame({f'{final_data.columns[0]}': final_pred.iloc[:,0].values}, index = new_date)
