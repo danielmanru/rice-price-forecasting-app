@@ -79,29 +79,26 @@ with st.sidebar:
     key="data_choose", 
     index=0, 
   )
-
+data_idx = language[lang]['list_data'].index(st.session_state.data_choose)
 st.title(f"{language[lang]['title']}")
 def add_space(n_space):
   for i in range(n_space):
     st.text(" ") 
 add_space(2)
 
-df_beras = pd.read_excel("datasets/export-eceran.xlsx", sheet_name = 1)
+if (data_idx == 0):
+  df_beras = pd.read_excel("datasets/export-eceran.xlsx", sheet_name = 1)
+elif (data_idx == 1):
+  df_beras = pd.read_excel("datasets/export-eceran-baru.xlsx", sheet_name = 1)
 df_beras = df_beras.rename(columns={' Komoditas (Rp) ': 'tanggal', 'Beras Premium' : 'beras_premium', 'Beras Medium': 'beras_medium'})
 
 def data_prep(data):
   data['tanggal'] = pd.to_datetime(data['tanggal'], dayfirst=True)
-  # beras_medium['tanggal'] = pd.to_datetime(beras_medium['tanggal'], dayfirst=True)
   data[data.columns[1]] = data[data.columns[1]].replace('-', np.nan)
-  # beras_medium[['beras_medium']] = beras_medium[['beras_medium']].replace('-', np.nan)
   data.set_index('tanggal', inplace=True)
-  # beras_medium.set_index('tanggal', inplace=True)
   data = data.asfreq('D')
-  # beras_medium = beras_medium.asfreq('D') 
   data[data.columns[0]] = data[data.columns[0]].interpolate(method='linear')
-  # beras_medium['beras_medium'] = beras_medium['beras_medium'].interpolate(method='linear')
   data = data.astype({data.columns[0]: int})
-  # beras_medium = beras_medium.astype({'beras_medium': int})
   return data
 
 data_idx = language[lang]['list_data'].index(st.session_state.data_choose)
@@ -188,14 +185,18 @@ add_space(1)
 window_size = 5
 steps = 14
 
-def load_model_final():
+def load_model_final(data_ver):
     lstm_model = []
-    sc_path = f"models/{rice_type}/model_final_forecasting/scaller_final_hybrid.pkl"
-    sarima_path = f"models/{rice_type}/model_final_forecasting/sarima_model_final_hybrid.pkl"
+    if (data_ver == 0):
+      path = f"models/{rice_type}/model_final_forecasting/"
+    elif (data_ver == 1):
+      path = f"models/{rice_type}/model_final_forecasting_baru/"
+    sc_path = path+"scaller_final_hybrid.pkl"
+    sarima_path = path+"sarima_model_final_hybrid.pkl"
     sc = joblib.load(sc_path)
     sarima_model = joblib.load(sarima_path)
     for i in range(steps):
-        model_path = f"models/{rice_type}/model_final_forecasting/lstm_model_final_{i}_hybrid.keras"
+        model_path = path+f"lstm_model_final_{i}_hybrid.keras"
         model = load_model(model_path)
         lstm_model.append(model)
     
@@ -269,11 +270,10 @@ def hybrid_model_predict_final(sm_model, lm_model, X, scaller):
 
   return all_pred['result'].to_frame()
 
-sc, sarima_model, lstm_model = load_model_final()
-pred = hybrid_model_predict_final(sarima_model, lstm_model, final_data.iloc[:-14], sc)
+sc, sarima_model, lstm_model = load_model_final(data_idx)
+pred = hybrid_model_predict_final(sarima_model, lstm_model, final_data, sc)
 final_pred = pred
-# final_pred = pred[pred.shape[0]-1:]
-# final_pred = final_pred.transpose() 
+
 last_date = final_data.index.max()
 new_date = pd.date_range(start = last_date + timedelta(days = 1), periods = steps)
 df_pred = pd.DataFrame({f'{final_data.columns[0]}': final_pred.iloc[:,0].values}, index = new_date)
@@ -339,5 +339,3 @@ else :
 st.subheader(language[lang]['header'][2])
 st.write(f"**Mean Absolute Error** : {mae}")
 st.write(f"**Mean Absolute Percentage Error** : {mape}%")
-
-st.write('testing streamlit')
