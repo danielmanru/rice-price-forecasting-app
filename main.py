@@ -60,7 +60,6 @@ with st.sidebar:
       lang = i
     continue
   st.title(st.session_state.title)
-
   if "label" not in st.session_state:
     st.session_state.label = f"**{language[0]['nav'][1]}**"
   if "index" not in st.session_state:
@@ -143,7 +142,6 @@ def load_datesets(ticker, date1, date2):
   return data, final_data, ticker, rice_type, lmd, rice_index
 
 data, final_data, name, rice_type, lmd, rice_index = load_datesets(selected_rice, start_date, end_date)
-
 data.index = data.index.strftime('%Y-%m-%d')
 data = data.reset_index()
 data = data.rename(columns={'tanggal':language[lang]['table'][0], data.columns[1] : name})
@@ -176,9 +174,8 @@ fig.layout.update(title_text = language[lang]['actual_chart'][rice_index],
                               xanchor="center",
                               x = 0.1,
                               font = dict(size = 14)))
-st.plotly_chart(fig)
+st.plotly_chart(fig)\
 
-##Forecasting
 add_space(1)
 st.subheader(language[lang]['header'][1])
 add_space(1)
